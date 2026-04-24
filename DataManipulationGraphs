@@ -1,0 +1,56 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+
+# 1. Generate RSSI vs Distance Data (Log-Distance Path Loss Model)
+distances = np.arange(1, 61, 1)
+p0 = -40  # RSSI at 1 meter
+n = 2.4   # Path loss exponent (Indoor)
+rssi_values = p0 - 10 * n * np.log10(distances)
+
+# Add Gaussian noise to simulate real-world RF interference
+np.random.seed(42)
+rssi_values += np.random.normal(0, 1.5, len(distances))
+
+rssi_df = pd.DataFrame({
+    'Distance_m': distances,
+    'RSSI_dBm': rssi_values
+})
+
+# Identify Relay Point (where RSSI crosses -75 dBm)
+relay_distance = rssi_df[rssi_df['RSSI_dBm'] <= -75]['Distance_m'].iloc[0]
+
+# 2. Generate Material Attenuation Data
+materials_data = {
+    'Material': ['Drywall', 'Concrete', 'Water', 'Steel/Metal'],
+    'Signal_Loss_dB': [4, 15, 25, 50],
+    'Packet_Loss_Percent': [3, 22, 85, 99.9]
+}
+material_df = pd.DataFrame(materials_data).sort_values(by='Packet_Loss_Percent')
+
+# Save DataFrames to CSV for external use
+rssi_df.to_csv('rssi_distance_data.csv', index=False)
+material_df.to_csv('material_attenuation_data.csv', index=False)
+
+# Plot 1: RSSI vs Distance
+plt.figure(figsize=(10, 6))
+plt.plot(rssi_df['Distance_m'], rssi_df['RSSI_dBm'], label='Signal Strength (RSSI)', color='blue', linewidth=2)
+plt.axhline(y=-75, color='red', linestyle='--', label='Relay Threshold (-75 dBm)')
+plt.axvline(x=relay_distance, color='orange', linestyle=':', label=f'Relay Recommended @ {relay_distance}m')
+plt.title('Signal Degradation (RSSI) vs. Distance')
+plt.xlabel('Distance (meters)')
+plt.ylabel('RSSI (dBm)')
+plt.grid(True, linestyle=':', alpha=0.7)
+plt.legend()
+plt.savefig('rssi_vs_distance.png')
+
+# Plot 2: Packet Loss vs Materials
+plt.figure(figsize=(10, 6))
+plt.bar(material_df['Material'], material_df['Packet_Loss_Percent'], color=['green', 'yellow', 'orange', 'red'])
+plt.title('Estimated Packet Loss by Obstruction Material')
+plt.xlabel('Material Type')
+plt.ylabel('Packet Loss (%)')
+plt.ylim(0, 105)
+for i, v in enumerate(material_df['Packet_Loss_Percent']):
+    plt.text(i, v + 2, f'{v}%', ha='center', fontweight='bold')
+plt.savefig('packet_loss_materials.png')
